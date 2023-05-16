@@ -24,3 +24,5 @@ Disabling the chatgpt response and just printing the `event_data` I get the foll
 ![debug2](screenshots/Slack_debugging2.png)
 
 Again the "event" was registered twice but there was only one response from the bot! what is going on?
+
+Apparently if the call to OpenAI API takes longer than 3 seconds Slack resends the POST request. [see this issue on slackeventsapi](https://github.com/slackapi/python-slack-events-api/issues/84)
