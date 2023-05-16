@@ -48,7 +48,7 @@ Under **Features** select "OAuth & Permissions". Copy the OAuth Token for the Wo
 
 Under **Settings** select "Basic Information". Copy the "Signing Secret" in the **App Credentials** section and save it in the environment variable `SLACK_SIGNING_SECRET`.
 
-Under **Features** select "Event Subscriptions". Toggle "Enable Events" (if it is not on already) and paste the url of your web app in the *Request Url* field and add the endpoint `/slack/event` to it. You should see a green check mark and *Verified* 
+Under **Features** select "Event Subscriptions". Toggle "Enable Events" (if it is not on already) and paste the url of your web app in the *Request Url* field and add the endpoint `/slack/event` (the endpoint is defined in the `SlackEventAdapter`) to it. You should see a green check mark and *Verified*
 
 ![Add app to channel](screenshots/Slack_eventVerified.png)
 
