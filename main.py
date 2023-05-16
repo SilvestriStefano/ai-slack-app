@@ -137,10 +137,7 @@ slack_event_adapter = SlackEventAdapter(SLACK_SIGNING_SECRET, endpoint='/slack/e
 
 client = WebClient(token=SLACK_BOT_TOKEN)
 
-# Get the bot id
-BOT_ID = client.api_call("auth.test")["user_id"] 
-
-@slack_event_adapter.on("app_mention") #  subscribe to only the message events that mention your app or bot
+@slack_event_adapter.on("app_mention") #  subscribe to only the message events that mention your app
 def on_slack_message(event_data):
   event = event_data["event"] # get the event
   channel = event["channel"] # get the channel id
@@ -148,19 +145,24 @@ def on_slack_message(event_data):
   text = event["text"] # get the body of the message
   ts = event["ts"] # get the individual id of the message so we can respond to it in a thread
   
-  if BOT_ID in text: #is the bot being addressed?
-    try:
-      user_assistant = history[user] 
-    except KeyError: # the user has never messaged the bot
-      history[user] = Chat() # initialize the chat
-      user_assistant = history[user]
-      user_assistant.ask_assistant(SYSTEM_MSGS) # provide the bot with the system prompts
-    finally:
-      prompt = "".join(re.split(r"(?:<@[A-Z0-9]*>)", text)) # remove the bot mention (<@BOT_ID>) from the message
-      user_input = Message("user", prompt)
-      response = user_assistant.ask_assistant(user_input.message_for_ai()) # prompt the bot
-      answer = response if type(response)==str else response.content 
-      client.chat_postMessage(channel=channel, thread_ts=ts, text=answer)
+  #### for debugging purposes
+  # logger.info(f"{user} asked '{text}'") 
+  # print(event_data)
+  # client.chat_postMessage(channel=channel, thread_ts=ts, text="testing")
+  ####
+  
+  try:
+    user_assistant = history[user] 
+  except KeyError: # the user has never messaged the bot
+    history[user] = Chat() # initialize the chat
+    user_assistant = history[user]
+    user_assistant.ask_assistant(SYSTEM_MSGS) # provide the bot with the system prompts
+  finally:
+    prompt = "".join(re.split(r"(?:<@[A-Z0-9]*>)", text)) # remove the bot mention (<@BOT_ID>) from the message
+    user_input = Message("user", prompt)
+    response = user_assistant.ask_assistant(user_input.message_for_ai()) # prompt the bot
+    answer = response if type(response)==str else response.content 
+    client.chat_postMessage(channel=channel, thread_ts=ts, text=answer)
     
 
     
