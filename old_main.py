@@ -1,11 +1,16 @@
+# It does not use slack-bolt.
+# It uses 
+#   slack-sdk==3.21.3
+#   slackeventsapi==3.0.1
+
 import os
 
 from typing import Union
 from pathlib import Path
 
-from flask import Flask, request
-from slack_bolt import App
-from slack_bolt.adapter.flask import SlackRequestHandler
+from flask import Flask
+from slack_sdk.web import WebClient
+from slackeventsapi import SlackEventAdapter
 from dotenv import load_dotenv
 import re
 import logging
@@ -23,13 +28,9 @@ logger.addHandler(ch)
 env_path = Path('.') / '.env'
 load_dotenv(dotenv_path=env_path)
 
-# Initialize app
-slack_bolt_app = App(
-  token=os.getenv("SLACK_BOT_TOKEN"),
-  signing_secret=os.getenv("SLACK_SIGNING_SECRET")
-)
-flask_app = Flask(__name__)
-handler = SlackRequestHandler(slack_bolt_app)
+# constants
+SLACK_SIGNING_SECRET = os.getenv("SLACK_SIGNING_SECRET")
+SLACK_BOT_TOKEN = os.getenv("SLACK_BOT_TOKEN")
 
 # Authenticate OpenAI
 openai.api_key = os.getenv("OPENAI_API_KEY")
@@ -132,40 +133,29 @@ SYSTEM_MSGS = [prompt.message_for_ai() for prompt in SYSTEM_PROMPTS]
 
 history = {} # conversation histories of the users history[userId] = Chat
 
-# Middleware functions
-def no_bot_messages(message)->bool:
-  """Checks it is not a bot message"""
-  return message.get("subtype") != "bot_message"
-  
-def no_tombstone(message)->bool:
-  """Checks that the message has not been deleted"""
-  return message.get("subtype") != "tombstone"
-  
-def bot_mentioned(message)->bool:
-  """Checks that the bot is mentioned"""
-  return 'U0587D4PN8H' in message['text']
+# Initialize app
+app = Flask(__name__)
 
-# binding the flask app to the handler
-@flask_app.route("/slack/events", methods=["POST"])
-def slack_events():
-    return handler.handle(request)
+# Set the callback to validate the bot to be an authorized user
+# Bind the Events API route to the existing Flask app by passing the server instance as the last param, or with \`server=app\`.
+slack_event_adapter = SlackEventAdapter(SLACK_SIGNING_SECRET, endpoint='/slack/events', server=app)
 
-# handling events
-@slack_bolt_app.event("app_mention")
-def on_app_mention(context, ack):
-  ack(f"Accepted! (app mention)")  
+client = WebClient(token=SLACK_BOT_TOKEN)
 
-@slack_bolt_app.event(
-  event="message",
-  matchers=[no_bot_messages, no_tombstone, bot_mentioned]
-)
-def app_reply(client,event,ack):
-  ack(f"Accepted! (message)") #acknowledge
+@slack_event_adapter.on("app_mention") #  subscribe to only the message events that mention your app
+def on_slack_message(event_data):
+  event = event_data["event"] # get the event
   channel = event["channel"] # get the channel id
   user = event["user"] # get the user id
   text = event["text"] # get the body of the message
   ts = event["ts"] # get the individual id of the message so we can respond to it in a thread
-    
+  
+  #### for debugging purposes
+  # logger.info(f"{user} asked '{text}'") 
+  # print(event_data)
+  # client.chat_postMessage(channel=channel, thread_ts=ts, text="testing")
+  ####
+  
   try:
     user_assistant = history[user] 
   except KeyError: # the user has never messaged the bot
@@ -178,8 +168,7 @@ def app_reply(client,event,ack):
     response = user_assistant.ask_assistant(user_input.message_for_ai()) # prompt the bot
     answer = response if type(response)==str else response.content 
     client.chat_postMessage(channel=channel, thread_ts=ts, text=answer)
-  
-## should write a function that handles the other messages 
-## otherwise we get an `Unhandled request ({'type': 'event_callback', 'event': {'type': 'message'}})`
+    
 
-flask_app.run(host="0.0.0.0", port=5000)
+    
+app.run(host="0.0.0.0", port=5000)
